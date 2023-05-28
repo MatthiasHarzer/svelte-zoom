@@ -63,7 +63,9 @@
 
   import { calculateAspectRatioFit, getDistance } from "./other"
 
-  import { onMount } from "svelte"
+  import {createEventDispatcher, onMount} from "svelte"
+
+  const dispatch = createEventDispatcher()
 
   let smooth = true
   let touchScreen = false
@@ -104,7 +106,9 @@
 
   export let zoom;
 
-  $: zoom = scale.value;
+  export let observable = true;
+
+  $: if(observable) zoom = scale.value
 
   function fireDown(x, y) {
     xY.initX = x
@@ -174,6 +178,7 @@
     const mat = matrix.scale(xFactor, yFactor, origin, in_x, in_y, ratio, scale.max, scale.value * xFactor, scale_factor)
 
     scale.value = mat.d
+    scale = scale;
     img.style.transform = `translate(${mat.e}px, ${mat.f}px) scale(${mat.d})`
   }
 
@@ -206,6 +211,8 @@
 
     scale.lastHypo = hypo
     scale.scaling = true
+
+    scale = scale;
   }
 
   function fireManualZoom(dir) {
@@ -223,6 +230,8 @@
     const mat = matrix.scale(xFactor, yFactor, origin, in_x, in_y, ratio, scale.max, scale.value * xFactor, dir)
     img.style.transform = `translate(${mat.e}px,${mat.f}px) scale(${mat.d})`
     scale.value = mat.d
+
+    scale = scale;
   }
 
   export const zoomIn = () => fireManualZoom(1)
@@ -254,6 +263,8 @@
     const mat = matrix.scale(xFactor, yFactor, origin, in_x, in_y, ratio, scale.max, scale.value * xFactor, dir)
     img.style.transform = `translate(${mat.e}px,${mat.f}px) scale(${mat.d})`
     scale.value = mat.d
+
+    scale = scale;
   }
 
   function onLoad() {
