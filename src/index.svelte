@@ -36,36 +36,43 @@
     visibility: hidden;
   }
 
-  .c-svelteZoom--willChange{
+  .c-svelteZoom--willChange {
     will-change: transform;
   }
+
+  .fit-cover {
+    object-fit: cover !important;
+    min-width: 100%;
+    min-height: 100%;
+  }
+
+
 </style>
 
 <img
-  {alt}
-  class="c-svelteZoom"
-  class:c-svelteZoom--contain={contain}
-  class:c-svelteZoom--no-contain={!contain}
-  class:c-svelteZoom--transition={smooth}
-  class:c-svelteZoom--visible={contain}
-  class:c-svelteZoom--hidden={contain === null}
-  class:c-svelteZoom--willChange={willChange}
-  bind:this={img}
-  on:mousedown={mousedown}
-  on:touchstart={touchstart}
-  on:load={onLoad}
-  {...$$props} />
+    {...$$props}
+    {alt}
+    bind:this={img}
+    class="c-svelteZoom"
+    class:c-svelteZoom--contain={contain}
+    class:c-svelteZoom--hidden={contain === null}
+    class:c-svelteZoom--no-contain={!contain}
+    class:c-svelteZoom--transition={smooth}
+    class:c-svelteZoom--visible={contain}
+    class:c-svelteZoom--willChange={willChange}
+    class:fit-cover={cover}
+    on:load={onLoad}
+    on:mousedown={mousedown}
+    on:touchstart={touchstart}/>
 
-<script>
+<script lang="ts">
   export let alt
   import Matrix from "./matrix"
   import MultiTouchVelocity from "./velocity"
 
-  import { calculateAspectRatioFit, getDistance } from "./other"
+  import {calculateAspectRatioFit, getDistance} from "./other"
 
-  import {createEventDispatcher, onMount} from "svelte"
-
-  const dispatch = createEventDispatcher()
+  import {onMount} from "svelte"
 
   let smooth = true
   let touchScreen = false
@@ -77,13 +84,15 @@
     newY: 0,
   }
 
-  let ratio, img
+  let ratio
+  let img
 
   let matrix
   let contain = null
   let willChange = true;
 
   let velocity = new MultiTouchVelocity()
+  let loadedResolve;
 
   let lastTap = {
     time: 0,
@@ -104,11 +113,23 @@
     max: 1,
   }
 
+  export let cover: boolean = false
   export let zoom;
 
-  export let observable = true;
+  export let zoomEnabled = true;
 
-  $: if(observable) zoom = scale.value
+  export const loaded = new Promise((resolve) => {
+    if (img && img.complete) {
+      resolve()
+    } else {
+      loadedResolve = resolve
+    }
+  })
+
+  $: if (zoomEnabled) zoom = scale.value
+  $: if(!zoomEnabled){
+    scale.value = 1
+  }
 
   function fireDown(x, y) {
     xY.initX = x
@@ -121,7 +142,7 @@
   }
 
   function fireMove(x, y) {
-    if (scale.scaling) return
+    if (scale.scaling || !zoomEnabled) return
     let in_x = (window.innerWidth - ratio.width * matrix.vtm.a) / 2
     let in_y = (window.innerHeight - ratio.height * matrix.vtm.a) / 2
 
@@ -133,6 +154,7 @@
   }
 
   function fireUp() {
+    if (!zoomEnabled) return
     matrix.x -= xY.newX
     matrix.y -= xY.newY
 
@@ -143,6 +165,7 @@
   }
 
   function fireScale(touchA, touchB) {
+    if (!zoomEnabled) return
     const xTouch = [Math.min(touchA.pageX, touchB.pageX), Math.max(touchA.pageX, touchB.pageX)]
 
     const yTouch = [Math.min(touchA.pageY, touchB.pageY), Math.max(touchA.pageY, touchB.pageY)]
@@ -160,6 +183,7 @@
   }
 
   function fireTapScale(x, y) {
+    if (!zoomEnabled) return
     let scaleVtm = matrix.vtm.a
     let scale_value = scaleVtm > 1 ? scaleVtm - 1 : scale.max / 2.5
     let scale_factor = scaleVtm > 1 ? -1 : 1
@@ -182,7 +206,8 @@
     img.style.transform = `translate(${mat.e}px, ${mat.f}px) scale(${mat.d})`
   }
 
-  function fireScaleMove(touchA, touchB, e) {
+  function fireScaleMove(touchA, touchB) {
+    if (!zoomEnabled) return
     const hypo = getDistance(touchA, touchB)
 
     let f = hypo / scale.lastHypo
@@ -238,6 +263,8 @@
 
   export const zoomOut = () => fireManualZoom(-1)
 
+
+
   function onResize() {
     onLoad()
     fireDown(0, 0)
@@ -247,6 +274,9 @@
 
   function onWheel(e) {
     e.preventDefault()
+
+    if (!zoomEnabled) return
+
     const dir = e.deltaY < 0 ? 1 : -1
 
     const xFactor = 1 + 0.1 * dir
@@ -268,17 +298,20 @@
   }
 
   function onLoad() {
-    const { naturalWidth, naturalHeight } = img
+    const {naturalWidth, naturalHeight} = img
+
+    ratio = calculateAspectRatioFit(naturalWidth, naturalHeight, window.innerWidth, window.innerHeight)
 
     contain = naturalWidth > window.innerWidth || naturalHeight > window.innerHeight
 
     scale.max = naturalWidth > naturalHeight ? Math.max(naturalWidth / window.innerWidth, 1) : Math.max(naturalHeight / window.innerHeight, 1)
-    ratio = calculateAspectRatioFit(naturalWidth, naturalHeight, window.innerWidth, window.innerHeight)
+
+    loadedResolve?.()
   }
 
   onMount(() => {
     matrix = new Matrix()
-    window.addEventListener("wheel", onWheel, { passive: false })
+    window.addEventListener("wheel", onWheel, {passive: false})
     window.addEventListener("resize", onResize)
     return () => {
       window.removeEventListener("wheel", onWheel)
@@ -300,7 +333,7 @@
 
       velocity.down(touchA, touchB)
     } else {
-      const { pageX, pageY } = touchA
+      const {pageX, pageY} = touchA
       var now = new Date().getTime()
       if (now - lastTap.time < 250 && Math.hypot(lastTap.x - pageX, lastTap.y - pageY) <= 20) {
         smooth = true
@@ -338,7 +371,7 @@
     window.removeEventListener("touchcancel", onTouchEnd)
   }
 
-  function onMouseDown({ clientX, clientY }) {
+  function onMouseDown({clientX, clientY}) {
     if (touchScreen) return
     fireDown(clientX, clientY)
 
@@ -348,7 +381,7 @@
     window.addEventListener("mouseup", onMouseUp)
   }
 
-  function onMouseMove({ clientX, clientY }) {
+  function onMouseMove({clientX, clientY}) {
     fireMove(clientX, clientY)
   }
 
