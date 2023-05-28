@@ -35,7 +35,7 @@
   .c-svelteZoom--hidden {
     visibility: hidden;
   }
-  
+
   .c-svelteZoom--willChange{
     will-change: transform;
   }
@@ -102,13 +102,17 @@
     max: 1,
   }
 
+  export let zoom;
+
+  $: zoom = scale.value;
+
   function fireDown(x, y) {
     xY.initX = x
     xY.initY = y
 
     matrix.x = matrix.vtm.e
     matrix.y = matrix.vtm.f
-    
+
     willChange = true;
   }
 
@@ -267,7 +271,7 @@
     window.addEventListener("resize", onResize)
     return () => {
       window.removeEventListener("wheel", onWheel)
-      window.removeEventListener("resize", onResize)      
+      window.removeEventListener("resize", onResize)
     }
   })
 
